@@ -1,0 +1,5 @@
+com\note\util\FileUtil.class
+com\note\config\AppConfig.class
+com\note\Main.class
+com\note\util\LogUtil.class
+com\note\NoteTranslator.class

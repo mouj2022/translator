@@ -1,2 +1,5 @@
 # translator
 这是基于Sonolus音游bestdori服务器导出的谱面的转译器
+基于把Sonolus的二进制文件转化成能加入到bestdori服务器的.json代码
+
+本软件由豆包AI大力支持，我只是负责测试

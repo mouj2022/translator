@@ -1,0 +1,2 @@
+# translator
+这是基于Sonolus音游bestdori服务器导出的谱面的转译器

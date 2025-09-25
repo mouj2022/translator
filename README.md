@@ -1,4 +1,4 @@
-# translator
+# translator 谱面转译器
 这是基于Sonolus音游bestdori服务器导出的谱面的转译器
 基于把Sonolus的二进制文件转化成能加入到bestdori服务器的.json代码
 

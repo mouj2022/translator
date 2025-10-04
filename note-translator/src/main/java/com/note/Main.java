@@ -42,10 +42,10 @@ public class Main {
             if (input.isFile()) {
                 // 处理单个文件
                 FileUtil.ensureFolderExists(outputPath);
-                translator.translateFile(input, outputPath);
+                translator.translateSingleFile(input, outputPath);
             } else if (input.isDirectory()) {
                 // 处理文件夹
-                translator.translateFolder(inputPath, outputPath);
+                translator.translateBatchFiles(inputPath, outputPath);
             } else {
                 logger.error("输入路径不存在: {}", inputPath);
             }

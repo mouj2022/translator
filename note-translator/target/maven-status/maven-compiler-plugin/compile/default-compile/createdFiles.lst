@@ -1,7 +1,8 @@
-com\note\util\FileUtil.class
-com\note\util\NoteLogUtil.class
-com\note\config\AppConfig.class
-com\note\Main.class
-com\note\util\LogUtil.class
-com\note\util\NoteLogUtil$NoteType.class
-com\note\NoteTranslator.class
+com/note/Entity.class
+com/note/util/NoteLogUtil.class
+com/note/NoteTranslator.class
+com/note/config/AppConfig.class
+com/note/util/LogUtil.class
+com/note/Main.class
+com/note/util/NoteLogUtil$NoteType.class
+com/note/util/FileUtil.class

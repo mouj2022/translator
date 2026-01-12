@@ -158,16 +158,20 @@ public class NoteTranslator {
 
             // 2. 单键（Tap/Flick → Single）
             if (archetype.equals("TapNote") || archetype.equals("FlickNote")) {
+                Entity entity = new Entity(original);
                 ObjectNode single = OBJECT_MAPPER.createObjectNode();
                 single.put("type", "Single");
-                if (archetype.equals("FlickNote")) single.put("flick", true);
+                // 检查是否有flick属性（FlickNote或TapNote带flick属性）
+                if (entity.hasFlick()) {
+                    single.put("flick", true);
+                }
                 single.put("beat", finalBeat);
                 single.put("lane", finalLane);
                 translated.add(single);
 
                 noteLog.logNoteTranslated(
                         i + 1, totalNoteCount,
-                        archetype.equals("TapNote") ? NoteType.BLUE : NoteType.PINK,
+                        entity.hasFlick() ? NoteType.PINK : NoteType.BLUE,
                         noteName, baseBeat, baseLane, finalBeat, finalLane, refs
                 );
                 continue;
@@ -298,41 +302,87 @@ public class NoteTranslator {
                                                  Map<String, JsonNode> noteMap, 
                                                  NoteLogUtil noteLog) {
         List<ObjectNode> slideNotes = new ArrayList<>();
-        // 按起始节点分组
-        Map<String, List<JsonNode>> slideGroups = new HashMap<>();
-        for (JsonNode note : slideRelated) {
-            String name = note.has("name") ? note.get("name").asText() : "";
-            JsonNode data = note.get("data");
-            String firstRef = (data != null && data.has("first")) ? data.get("first").get("ref").asText() : "";
-            String groupKey = firstRef.isEmpty() ? name : firstRef;
-            slideGroups.computeIfAbsent(groupKey, k -> new ArrayList<>()).add(note);
+        
+        // 创建 Entity 映射
+        Map<String, Entity> entityMap = new HashMap<>();
+        for (Map.Entry<String, JsonNode> entry : noteMap.entrySet()) {
+            entityMap.put(entry.getKey(), new Entity(entry.getValue()));
         }
-
-        // 处理每个Slide组
-        for (Map.Entry<String, List<JsonNode>> entry : slideGroups.entrySet()) {
-            List<JsonNode> slideNodes = entry.getValue();
-            // 按beat排序（保证滑动顺序）
-            slideNodes.sort(Comparator.comparingDouble(this::getBaseBeat));
-
-            // 构建connections（开发态 + 微调）
+        
+        // 找出所有 SlideStartNote
+        List<Entity> slideStarts = new ArrayList<>();
+        for (JsonNode node : slideRelated) {
+            Entity entity = new Entity(node);
+            if (entity.isSlideStart()) {
+                slideStarts.add(entity);
+            }
+        }
+        
+        // 为每个 SlideStartNote 生成完整的 Slide
+        for (Entity startEntity : slideStarts) {
             ArrayNode connections = OBJECT_MAPPER.createArrayNode();
-            for (JsonNode node : slideNodes) {
+            List<Entity> slideChain = new ArrayList<>();
+            
+            // 添加起始点
+            slideChain.add(startEntity);
+            
+            // 跟踪链表：先尝试 next，再尝试 last
+            Entity current = startEntity;
+            while (current != null) {
+                String nextRef = current.getNextRefName();
+                if (nextRef == null || nextRef.isEmpty()) {
+                    nextRef = current.getLastRefName();
+                }
+                
+                if (nextRef != null && !nextRef.isEmpty() && entityMap.containsKey(nextRef)) {
+                    Entity nextEntity = entityMap.get(nextRef);
+                    // 避免循环引用
+                    if (!slideChain.contains(nextEntity)) {
+                        slideChain.add(nextEntity);
+                        current = nextEntity;
+                    } else {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            }
+            
+            // 构建 connections 数组
+            for (int i = 0; i < slideChain.size(); i++) {
+                Entity entity = slideChain.get(i);
                 ObjectNode conn = OBJECT_MAPPER.createObjectNode();
-                conn.put("beat", getBaseBeat(node) + reverseVerticalOffset);
-                conn.put("lane", getBaseLane(node) + reverseLaneOffset);
+                conn.put("beat", entity.getBeat() + reverseVerticalOffset);
+                conn.put("lane", entity.getLane() + reverseLaneOffset);
+                
+                // 检查是否为最后一个节点且有flick属性
+                if (i == slideChain.size() - 1 && entity.hasFlick()) {
+                    conn.put("flick", true);
+                }
+                
                 connections.add(conn);
             }
-
-            // 生成开发态Slide
-            ObjectNode slide = OBJECT_MAPPER.createObjectNode();
-            slide.put("type", "Slide");
-            slide.set("connections", connections);
-            slideNotes.add(slide);
-
-            // 日志记录
-            noteLog.logTranslateStart("生成Slide | 起始beat：" + connections.get(0).get("beat").asDouble() 
-                                     + " | 节点数：" + connections.size());
+            
+            // 只有当 connections 至少有2个节点时才生成 Slide
+            if (connections.size() >= 2) {
+                ObjectNode slide = OBJECT_MAPPER.createObjectNode();
+                slide.put("type", "Slide");
+                slide.set("connections", connections);
+                slideNotes.add(slide);
+                
+                // 日志记录
+                Entity lastEntity = slideChain.get(slideChain.size() - 1);
+                noteLog.logTranslateStart(String.format("生成Slide | 起始beat：%.2f | 节点数：%d | 末端flick：%s", 
+                    connections.get(0).get("beat").asDouble(), 
+                    connections.size(),
+                    lastEntity.hasFlick() ? "是" : "否"));
+            } else if (connections.size() == 1) {
+                // 如果只有一个节点，转换为 Single
+                noteLog.logTranslateStart("警告：Slide只有一个节点，转换为Single | beat：" 
+                    + connections.get(0).get("beat").asDouble());
+            }
         }
+        
         return slideNotes;
     }
 
@@ -340,7 +390,7 @@ public class NoteTranslator {
     private String mapToDevType(String archetype) {
         return switch (archetype) {
             case "TapNote", "FlickNote" -> "Single";
-            case "SlideStartNote", "SlideTickNote", "SlideEndNote", 
+            case "SlideStartNote", "SlideTickNote", "SlideEndNote", "SlideEndFlickNote",
                  "StraightSlideConnector", "CurvedSlideConnector" -> "Slide";
             case "SimLine" -> "SimLine";
             case "IgnoredNote" -> "Ignored";

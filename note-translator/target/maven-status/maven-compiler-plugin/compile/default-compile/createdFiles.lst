@@ -1,3 +1,4 @@
+com/note/Entity.class
 com/note/util/NoteLogUtil.class
 com/note/NoteTranslator.class
 com/note/config/AppConfig.class

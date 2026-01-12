@@ -144,7 +144,7 @@ public class NoteLogUtil {
         return switch (archetype) {
             case "TapNote" -> NoteType.BLUE;
             case "FlickNote" -> NoteType.PINK;
-            case "SlideStartNote", "SlideTickNote", "SlideEndNote" -> NoteType.SLIDE;
+            case "SlideStartNote", "SlideTickNote", "SlideEndNote", "SlideEndFlickNote" -> NoteType.SLIDE;
             case "StraightSlideConnector", "CurvedSlideConnector" -> NoteType.CONNECTOR;
             case "LongNote" -> NoteType.LONG;
             case "EffectNote" -> NoteType.EFFECT;
